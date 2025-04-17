@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Productivity Dashboard</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    </head>
+<body>
+    <h1>My Productivity Dashboard</h1>
+    
+    <!-- Container for 2x2 grid layout -->
+    <div class="container">
+        
+        <!-- To-Do List Section -->
+        <div class="card">
+            <h3>📝 To-Do List</h3>
+            <form method="POST">
+                <input type="text" name="task" placeholder="Enter a task" required>
+                <button type="submit">Add</button>
+            </form>
+
+            <ul>
+                {% for task in tasks %}
+                <li>
+                    <span class="task-text">{{ task[1] }}</span>
+                    <div class="task-actions">
+                        <form method="POST" action="/delete/{{ task[0] }}">
+                            <button>❌</button>
+                        </form>
+                        <form onsubmit="openModal('{{ task[0] }}', '{{ task[1] }}'); return false;">
+                            <button type="submit">✏️</button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Weather Section -->
+        <div class="card">
+            <h3>🌦️ Weather</h3>
+            <input type="text" id="city" placeholder="Enter city">
+            <button onclick="getWeather()">Get Weather</button>
+            <p id="weatherResult"></p>
+        </div>
+
+        <!-- Quote Section -->
+        <div class="card">
+            <h3>💬 Daily Quote</h3>
+            <p id="quoteText">Loading quote...</p>
+            <button onclick="fetchQuote()">Generate Quote</button>
+        </div>
+
+        <!-- Pomodoro Timer HTML -->
+        <div class="card">
+            <h3>⏳ Pomodoro Timer</h3>
+            <input type="number" id="pomodoroInput" placeholder="Minutes" min="1">
+            <p id="timer">00:00</p>
+            <button onclick="startPomodoro()">Start</button>
+            <button onclick="pausePomodoro()">Pause</button>
+            <button onclick="resumePomodoro()">Resume</button>
+        </div>
+    </div>
+
+    <!-- Update Modal -->
+    <div id="updateModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">×</span>
+            <form id="updateForm" method="POST">
+                <input type="text" name="task" id="updateTaskInput" required>
+                <button type="submit">Update</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Modal functionality
+            function openModal(taskId, taskText) {
+            document.getElementById("updateTaskInput").value = taskText;
+            document.getElementById("updateForm").action = `/update/${taskId}`;
+            document.getElementById("updateModal").style.display = "block";
+        }
+
+        function closeModal() {
+            document.getElementById("updateModal").style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById("updateModal");
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+        // Weather API functionality
+        function getWeather() {
+            const city = document.getElementById("city").value;
+            fetch(`/weather?city=${city}`)
+                .then(res => res.json())
+                .then(data => {
+                    const resultDiv = document.getElementById("weatherResult");
+                    if (data.error) {
+                        resultDiv.innerHTML = `<span style="color: red;">${data.error}</span>`;
+                    } else {
+                        const iconUrl = `https://openweathermap.org/img/wn/${data.icon}@2x.png`;
+                        resultDiv.innerHTML = `
+                            <img src="${iconUrl}" alt="weather icon" style="vertical-align: middle;">
+                            <strong>${data.temp}°C</strong>, ${data.description}
+                        `;
+                    }
+                });
+        }
+    
+        // Pomodoro Timer functionality
+        let totalTime = 0;
+        let interval;
+        let isPaused = false;
+    
+        function startPomodoro() {
+            clearInterval(interval);
+            const minutes = parseInt(document.getElementById("pomodoroInput").value);
+            if (isNaN(minutes) || minutes <= 0) {
+                alert("Please enter a valid number of minutes.");
+                return;
+            }
+    
+            totalTime = minutes * 60;
+            isPaused = false;
+            updateDisplay();
+    
+            interval = setInterval(() => {
+                if (!isPaused) {
+                    totalTime--;
+                    updateDisplay();
+                    if (totalTime <= 0) {
+                        clearInterval(interval);
+                        alert("Pomodoro session complete! ⏰");
+                    }
+                }
+            }, 1000);
+        }
+    
+        function pausePomodoro() {
+            isPaused = true;
+        }
+    
+        function resumePomodoro() {
+            if (totalTime > 0 && isPaused) {
+                isPaused = false;
+            }
+        }
+    
+        function updateDisplay() {
+            const min = Math.floor(totalTime / 60);
+            const sec = totalTime % 60;
+            document.getElementById("timer").innerText = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+            document.getElementById("timer").style.color = totalTime <= 60 ? "red" : "black"; // Change color to red if less than 1 minute
+            document.getElementById("timer").style.fontSize = "4em";
+        }
+
+        // Fetch a random quote from ZenQuotes API
+        function fetchQuote() {
+    fetch("/quote")
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById("quoteText").innerText = "Could not fetch a quote at the moment.";
+            } else {
+                const quote = `"${data.quote}" – ${data.author}`;
+                document.getElementById("quoteText").innerText = quote;
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching quote:', error);
+            document.getElementById("quoteText").innerText = "Could not fetch a quote at the moment.";
+        });
+}
+        
+
+        // Load a quote by default when page loads
+        window.onload = function () {
+            fetchQuote();
+        };
+    </script>
+    
+</body>
+</html>
